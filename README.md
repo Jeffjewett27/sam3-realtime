@@ -1,5 +1,7 @@
 # Real-Time Streaming Adaptation of SAM3
 
+![sam3-real-time](https://github.com/user-attachments/assets/f2a01527-c1c8-486f-9a10-cbed1ca6a2b4)
+
 This repository transforms [SAM3](https://github.com/facebookresearch/sam3)’s offline video inference into a live, real-time streaming pipeline. Instead of preloading and processing an entire video sequence offline, it ingests frames incrementally and performs per-frame inference on the fly. This allows SAM3 to work with any live video source (e.g. webcams, RTSP streams, [YARP](https://www.yarp.it/latest/index.html) ports), enabling online operation and expanding use cases to robotics, teleoperation, live surveillance, AR/VR and real-time content creation.
 
 ## Installation
