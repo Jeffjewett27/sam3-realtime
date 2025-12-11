@@ -2,29 +2,24 @@
 
 import logging
 from collections import defaultdict
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 import torch
-import torch.distributed as dist
-import torch.nn.functional as F
-from typing import Any, Dict, Optional, Tuple
-from PIL import Image
 import torchvision.transforms.functional as TF
+from PIL import Image
+from torchvision.ops import masks_to_boxes
 
 from sam3 import perflib
 from sam3.logger import get_logger
 from sam3.model.act_ckpt_utils import clone_output_wrapper
 from sam3.model.box_ops import box_xywh_to_cxcywh, box_xyxy_to_xywh
-from sam3.model.data_misc import BatchedDatapoint, convert_my_tensors, FindStage
+from sam3.model.data_misc import BatchedDatapoint, FindStage, convert_my_tensors
 from sam3.model.geometry_encoders import Prompt
-from sam3.model.io_utils import IMAGE_EXTS, load_resource_as_video_frames
-from sam3.model.sam3_tracker_utils import fill_holes_in_mask_scores
 from sam3.model.sam3_video_base import MaskletConfirmationStatus, Sam3VideoBase
 from sam3.model.utils.misc import copy_data_to_device
 from sam3.perflib.compile import compile_wrapper, shape_logging_wrapper
 from sam3.perflib.masks_ops import masks_to_boxes as perf_masks_to_boxes
-from torchvision.ops import masks_to_boxes
-from tqdm.auto import tqdm
 
 logger = get_logger(__name__)
 
@@ -95,9 +90,26 @@ class Sam3StreamInference(Sam3VideoBase):
 
     @torch.inference_mode()
     def reset_stream(self, inference_state: Dict[str, Any]) -> None:
-        new_state = self.init_stream_state()
-        inference_state.clear()
-        inference_state.update(new_state)
+        """Revert `inference_state` to what it was right after initialization."""
+        inference_state["input_batch"].find_text_batch[0] = "<text placeholder>"
+        inference_state["text_prompt"] = None
+        for t in range(inference_state["num_frames"]):
+            inference_state["input_batch"].find_inputs[t].text_ids[...] = 0
+            # constructing an output list in inference state (we start with an empty list)
+            inference_state["previous_stages_out"][t] = None
+            inference_state["per_frame_raw_point_input"][t] = None
+            inference_state["per_frame_raw_box_input"][t] = None
+            inference_state["per_frame_visual_prompt"][t] = None
+            inference_state["per_frame_geometric_prompt"][t] = None
+            inference_state["per_frame_cur_step"][t] = 0
+
+        inference_state["visual_prompt_embed"] = None
+        inference_state["visual_prompt_mask"] = None
+        inference_state["tracker_inference_states"].clear()
+        inference_state["tracker_metadata"].clear()
+        inference_state["feature_cache"].clear()
+        inference_state["cached_frame_outputs"].clear()
+        inference_state["action_history"].clear()  # for logging user actions
 
     def _preprocess_raw_image(self, raw_image: Any) -> Tuple[torch.Tensor, int, int]:
         if isinstance(raw_image, Image.Image):
