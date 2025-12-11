@@ -95,9 +95,26 @@ class Sam3StreamInference(Sam3VideoBase):
 
     @torch.inference_mode()
     def reset_stream(self, inference_state: Dict[str, Any]) -> None:
-        new_state = self.init_stream_state()
-        inference_state.clear()
-        inference_state.update(new_state)
+        """Revert `inference_state` to what it was right after initialization."""
+        inference_state["input_batch"].find_text_batch[0] = "<text placeholder>"
+        inference_state["text_prompt"] = None
+        for t in range(inference_state["num_frames"]):
+            inference_state["input_batch"].find_inputs[t].text_ids[...] = 0
+            # constructing an output list in inference state (we start with an empty list)
+            inference_state["previous_stages_out"][t] = None
+            inference_state["per_frame_raw_point_input"][t] = None
+            inference_state["per_frame_raw_box_input"][t] = None
+            inference_state["per_frame_visual_prompt"][t] = None
+            inference_state["per_frame_geometric_prompt"][t] = None
+            inference_state["per_frame_cur_step"][t] = 0
+
+        inference_state["visual_prompt_embed"] = None
+        inference_state["visual_prompt_mask"] = None
+        inference_state["tracker_inference_states"].clear()
+        inference_state["tracker_metadata"].clear()
+        inference_state["feature_cache"].clear()
+        inference_state["cached_frame_outputs"].clear()
+        inference_state["action_history"].clear()  # for logging user actions
 
     def _preprocess_raw_image(self, raw_image: Any) -> Tuple[torch.Tensor, int, int]:
         if isinstance(raw_image, Image.Image):
