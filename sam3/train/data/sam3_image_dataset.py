@@ -180,6 +180,10 @@ class CustomCocoDetectionAPI(VisionDataset):
     def _load_images(
         self, datapoint_id: int, img_ids_to_load: Optional[Set[int]] = None
     ) -> Tuple[List[Tuple[int, PILImage.Image]], List[Dict[str, Any]]]:
+        # Lazy load decord to avoid a hard dependency on it on the sam3
+        # package as a whole
+        from decord import VideoReader, cpu
+
         all_images = []
         all_img_metadata = []
         for current_meta in self.coco.loadImagesFromDatapoint(datapoint_id):
